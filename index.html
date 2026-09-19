@@ -101,11 +101,62 @@ codigo=jsQR(imagemDados.data,imagemDados.width,imagemDados.height,{inversionAtte
 }
 if(codigo&&codigo.data){
 const valor=String(codigo.data).trim().toUpperCase();
+
 if(valor){
-valorQR.textContent=valor;resultado.style.display='block';
-status.className='status sucesso';
-status.textContent='QR Code encontrado com sucesso.';
-pararCamera();return;
+
+  valorQR.textContent=valor;
+  resultado.style.display='block';
+
+  status.className='status sucesso';
+  status.textContent='QR Code encontrado com sucesso.';
+
+
+  /*
+   * ENVIA O CHASSI PARA O APP MONTADORES
+   */
+
+  if(window.opener){
+
+    window.opener.postMessage(
+      {
+        tipo:'CHASSI_QR',
+        valor:valor
+      },
+      '*'
+    );
+
+  }
+
+
+  /*
+   * PARA A CÂMERA
+   */
+
+  pararCamera();
+
+
+  /*
+   * TENTA FECHAR ESTA ABA
+   */
+
+  setTimeout(function(){
+
+    try{
+
+      window.close();
+
+    }catch(e){
+
+      console.log(
+        'Não foi possível fechar a janela automaticamente.'
+      );
+
+    }
+
+  },300);
+
+
+  return;
 }
 }
 }
