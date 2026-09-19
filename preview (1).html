@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#111111">
+<title>Teste de Câmera QR</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:20px;font-family:Arial,sans-serif;background:#f4f4f4;color:#222}
+.container{max-width:600px;margin:0 auto;background:#fff;padding:20px;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.10)}
+h1{margin-top:0;font-size:22px;text-align:center}
+.status{margin:15px 0;padding:12px;border-radius:8px;background:#eee;text-align:center;font-weight:bold;line-height:1.4}
+video{width:100%;max-height:420px;object-fit:cover;border-radius:12px;background:#000;display:none}
+canvas{display:none}
+button{width:100%;padding:15px;border:0;border-radius:10px;font-size:17px;font-weight:bold;cursor:pointer;margin-top:10px}
+#btnCamera{background:#111;color:#fff}
+#btnParar{background:#ddd;color:#222;display:none}
+.resultado{margin-top:18px;padding:15px;border:2px solid #222;border-radius:10px;background:#fafafa;word-break:break-word;display:none}
+.resultado strong{display:block;margin-bottom:8px}
+.ajuda{margin-top:18px;font-size:14px;line-height:1.5;color:#555}
+.erro{background:#ffe8e8}.sucesso{background:#e8f7e8}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>📷 TESTE DE CÂMERA + QR CODE</h1>
+<div id="status" class="status">Toque em "ABRIR CÂMERA" para começar.</div>
+<video id="video" autoplay muted playsinline webkit-playsinline></video>
+<canvas id="canvas"></canvas>
+<button id="btnCamera" type="button">📷 ABRIR CÂMERA</button>
+<button id="btnParar" type="button">⏹ PARAR CÂMERA</button>
+<div id="resultado" class="resultado">
+<strong>QR CODE ENCONTRADO:</strong>
+<span id="valorQR"></span>
+</div>
+<div class="ajuda">
+<strong>Teste:</strong><br>
+1. Toque em "ABRIR CÂMERA".<br>
+2. Quando o celular perguntar, permita o acesso à câmera.<br>
+3. Aponte para um QR Code.<br>
+4. O sistema tentará identificar o conteúdo automaticamente.
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+let stream=null,lendo=false,animationFrame=null;
+const video=document.getElementById('video');
+const canvas=document.getElementById('canvas');
+const contexto=canvas.getContext('2d',{willReadFrequently:true});
+const status=document.getElementById('status');
+const btnCamera=document.getElementById('btnCamera');
+const btnParar=document.getElementById('btnParar');
+const resultado=document.getElementById('resultado');
+const valorQR=document.getElementById('valorQR');
+
+btnCamera.addEventListener('click',abrirCamera);
+btnParar.addEventListener('click',pararCamera);
+
+async function abrirCamera(){
+resultado.style.display='none';valorQR.textContent='';
+if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+mostrarErro('Este navegador não disponibiliza acesso à câmera.');return;
+}
+btnCamera.disabled=true;
+status.className='status';
+status.textContent='Solicitando autorização da câmera...';
+try{
+stream=await navigator.mediaDevices.getUserMedia({
+video:{facingMode:{ideal:'environment'}},audio:false
+});
+video.srcObject=stream;
+video.style.display='block';
+await video.play();
+lendo=true;
+btnCamera.style.display='none';
+btnParar.style.display='block';
+status.className='status';
+status.textContent='Câmera autorizada. Aponte para um QR Code...';
+lerQR();
+}catch(erro){
+console.error(erro);pararCamera();
+let mensagem='Não foi possível acessar a câmera.';
+if(erro&&erro.name==='NotAllowedError')mensagem='O acesso à câmera foi negado. Verifique a permissão da câmera no navegador.';
+if(erro&&erro.name==='NotFoundError')mensagem='Nenhuma câmera foi encontrada neste aparelho.';
+if(erro&&erro.name==='SecurityError')mensagem='O navegador bloqueou o acesso à câmera por motivo de segurança.';
+mostrarErro(mensagem);
+}
+}
+
+function lerQR(){
+if(!lendo)return;
+if(video.readyState>=2&&video.videoWidth>0&&video.videoHeight>0){
+canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+contexto.drawImage(video,0,0,canvas.width,canvas.height);
+const imagemDados=contexto.getImageData(0,0,canvas.width,canvas.height);
+let codigo=null;
+if(typeof jsQR==='function'){
+codigo=jsQR(imagemDados.data,imagemDados.width,imagemDados.height,{inversionAttempts:'attemptBoth'});
+}
+if(codigo&&codigo.data){
+const valor=String(codigo.data).trim().toUpperCase();
+if(valor){
+valorQR.textContent=valor;resultado.style.display='block';
+status.className='status sucesso';
+status.textContent='QR Code encontrado com sucesso.';
+pararCamera();return;
+}
+}
+}
+animationFrame=requestAnimationFrame(lerQR);
+}
+
+function pararCamera(){
+lendo=false;
+if(animationFrame){cancelAnimationFrame(animationFrame);animationFrame=null}
+if(stream){stream.getTracks().forEach(function(track){track.stop()});stream=null}
+video.pause();video.srcObject=null;video.style.display='none';
+btnCamera.disabled=false;btnCamera.style.display='block';btnParar.style.display='none';
+}
+
+function mostrarErro(mensagem){
+status.className='status erro';status.textContent=mensagem;
+btnCamera.disabled=false;btnCamera.style.display='block';btnParar.style.display='none';
+}
+window.addEventListener('beforeunload',function(){pararCamera()});
+</script>
+</body>
+</html>
